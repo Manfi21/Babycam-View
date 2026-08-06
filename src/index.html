@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0b0e14" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#f4f6f9" media="(prefers-color-scheme: light)">
+    <title>BabyCam View</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <main class="card">
+        <header class="brand">
+            <img src="icons/icon-128.png" alt="" class="brand-icon" onerror="this.style.display='none'">
+            <div>
+                <h1>BabyCam View</h1>
+                <p class="subtitle">Connect to BabyCamOS web server</p>
+            </div>
+        </header>
+
+        <form id="settingsForm" autocomplete="off">
+            <label class="field">
+                <span>Hostname</span>
+                <input type="text" id="hostname" value="babycam" placeholder="babycam">
+            </label>
+
+            <label class="field">
+                <span>Local IP</span>
+                <input type="text" id="localIp" placeholder="e.g. 192.168.1.50">
+            </label>
+
+            <label class="field">
+                <span>Tailscale IP</span>
+                <input type="text" id="tailscaleIp" placeholder="e.g. 100.100.100.1">
+            </label>
+
+            <hr class="divider">
+
+            <label class="field">
+                <span>Camera</span>
+                <input type="text" id="cameraName" placeholder="Camera name (e.g. babycam-test)">
+            </label>
+
+            <label class="field">
+                <span>Saved cameras</span>
+                <select id="profileSelect"></select>
+            </label>
+
+            <div class="btn-row">
+                <button type="button" id="saveProfileBtn" class="btn secondary">Save</button>
+                <button type="button" id="newProfileBtn" class="btn secondary">New</button>
+                <button type="button" id="deleteProfileBtn" class="btn secondary">Delete</button>
+            </div>
+
+            <button type="submit" id="connectBtn" class="btn primary">Connect</button>
+        </form>
+
+        <p class="hint">Provide at least one address (web server on port 80). IPs are verified and updated automatically when connecting to a camera. Use Save to store multiple cameras.</p>
+
+        <div id="status" class="status hidden"></div>
+    </main>
+
+    <script src="bridge.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

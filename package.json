@@ -1,0 +1,37 @@
+{
+  "name": "babycam-view",
+  "private": true,
+  "version": "0.1.0",
+  "description": "BabyCam View - simple viewer for the BabyCamOS web server (WebRTC)",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "^34",
+    "electron-builder": "^25"
+  },
+  "build": {
+    "appId": "com.oelpingu.babcamview",
+    "productName": "BabyCamView",
+    "compression": "normal",
+    "afterPack": "tools/afterPack.js",
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": "AppImage",
+      "category": "Utility",
+      "icon": "src/icons"
+    },
+    "win": {
+      "target": "nsis"
+    }
+  },
+  "allowScripts": {
+    "electron@34.5.8": true
+  }
+}
