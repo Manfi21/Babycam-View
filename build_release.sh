@@ -159,7 +159,7 @@ build_linux_appimage() {
     ' "$pkg_version"
   fi
   log "Building Linux AppImage (electron-builder) ..."
-  npx electron-builder --linux AppImage
+  npx electron-builder --linux AppImage --publish never
   appimage="$(ls dist/*.AppImage 2>/dev/null | head -1 || true)"
   if [ -z "$appimage" ]; then
     echo "ERROR: No AppImage found in dist/." >&2
@@ -178,7 +178,7 @@ build_windows() {
     return
   fi
   log "Building Windows NSIS ..."
-  npx electron-builder --win nsis
+  npx electron-builder --win nsis --publish never
   dest="$BUILD_DIR/${BASE_NAME}_x64.exe"
   cp "$(ls dist/*.exe 2>/dev/null | head -1)" "$dest"
   log "Installer -> $dest"

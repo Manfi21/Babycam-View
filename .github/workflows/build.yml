@@ -45,7 +45,7 @@ jobs:
             exit 1
           fi
           mkdir -p "$HOME/.keystores"
-          echo "$KEYSTORE_BASE64" | base64 -d > "$HOME/.keystores/babycam-view.keystore"
+          echo "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > "$HOME/.keystores/babycam-view.keystore"
           chmod 600 "$HOME/.keystores/babycam-view.keystore"
 
       - name: Build Android APK + Linux AppImage
@@ -108,7 +108,7 @@ jobs:
         run: node -e "const fs=require('fs');const p='package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j.version=process.argv[1].replace(/^v/,'');fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n','utf8')" "${{ github.ref_name }}"
 
       - name: Build Windows NSIS installer
-        run: npx electron-builder --win nsis
+        run: npx electron-builder --win nsis --publish never
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
