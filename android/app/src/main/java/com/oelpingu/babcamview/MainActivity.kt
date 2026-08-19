@@ -82,6 +82,8 @@ class MainActivity : Activity() {
         val settings = webView.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
+        settings.setSupportZoom(true)
+        settings.setBuiltInZoomControls(true)
         settings.mediaPlaybackRequiresUserGesture = false
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         settings.loadWithOverviewMode = true
@@ -103,6 +105,12 @@ class MainActivity : Activity() {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                if (url != null && url.startsWith("http")) {
+                    view?.evaluateJavascript(
+                        """(function(){if(document.getElementById('bc-zoom'))return;var s=document.createElement('style');s.id='bc-zoom';s.textContent='iframe{touch-action:manipulation}';document.head.appendChild(s)})()""",
+                        null
+                    )
+                }
             }
         }
 
