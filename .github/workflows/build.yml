@@ -63,12 +63,7 @@ jobs:
             echo "version.properties unchanged - nothing to commit"
           else
             git commit -m "chore: bump versionCode for ${GITHUB_REF_NAME}"
-            BRANCH="$(git branch -r --contains HEAD | sed -n '1p' | sed 's/.*origin\///' | tr -d ' ')"
-            if [ -n "$BRANCH" ]; then
-              git push origin "HEAD:$BRANCH"
-            else
-              echo "::warning::Could not determine target branch for version.properties commit"
-            fi
+            git push origin "HEAD:main"
           fi
 
       - name: Upload APK
