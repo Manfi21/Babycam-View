@@ -2,9 +2,15 @@ package com.oelpingu.babcamview
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.DownloadManager
+import android.content.Context
+import android.content.Intent
+import android.database.Cursor
+import android.net.Uri
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -88,6 +94,11 @@ class MainActivity : Activity() {
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         settings.loadWithOverviewMode = true
         settings.useWideViewPort = true
+
+        val appVersion = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "0.0.0"
+        } catch (_: Exception) { "0.0.0" }
+        settings.userAgentString = "${settings.userAgentString} BabyCamView/$appVersion"
 
         val assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/", WebViewAssetLoader.AssetsPathHandler(this))
@@ -351,6 +362,81 @@ class MainActivity : Activity() {
         runOnUiThread { webView.loadUrl(url) }
     }
 
+    private fun appVersion(): String = try {
+        packageManager.getPackageInfo(packageName, 0).versionName ?: "0.0.0"
+    } catch (_: Exception) { "0.0.0" }
+
+    private fun checkUpdate(): JSONObject {
+        val result = JSONObject()
+        result.put("currentVersion", appVersion())
+        try {
+            val url = URL("https://api.github.com/repos/Manfi21/Babycam-View/releases/latest")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.connectTimeout = 8000
+            conn.readTimeout = 8000
+            conn.setRequestProperty("Accept", "application/vnd.github+json")
+            if (conn.responseCode == 200) {
+                val body = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
+                val json = JSONObject(body)
+                result.put("latestVersion", json.optString("tag_name", "").removePrefix("v"))
+                result.put("releaseNotes", json.optString("body", ""))
+                result.put("releaseUrl", json.optString("html_url", ""))
+                val assets = json.optJSONArray("assets")
+                if (assets != null) {
+                    for (i in 0 until assets.length()) {
+                        val a = assets.getJSONObject(i)
+                        if (a.optString("name", "").endsWith(".apk")) {
+                            result.put("downloadUrl", a.getString("browser_download_url"))
+                            break
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+        return result
+    }
+
+    private fun installUpdate(downloadUrl: String) {
+        val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val req = DownloadManager.Request(Uri.parse(downloadUrl))
+            .setTitle("BabyCam View Update")
+            .setDescription("Downloading update…")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "BabyCamView.apk")
+            .setAllowedOverMetered(true)
+        val downloadId = dm.enqueue(req)
+
+        Thread {
+            var cursor: Cursor? = null
+            try {
+                while (true) {
+                    cursor = dm.query(DownloadManager.Query().setFilterById(downloadId))
+                    if (cursor != null && cursor.moveToFirst()) {
+                        val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                        if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                            val uriStr = cursor.getString(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI))
+                            val fileUri = Uri.parse(uriStr)
+                            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(fileUri, "application/vnd.android.package-archive")
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            runOnUiThread { startActivity(installIntent) }
+                            break
+                        } else if (status == DownloadManager.STATUS_FAILED) {
+                            break
+                        }
+                    }
+                    cursor?.close()
+                    Thread.sleep(1000)
+                }
+            } catch (_: Exception) {
+            } finally {
+                cursor?.close()
+            }
+        }.start()
+    }
+
     private inner class Bridge {
         @JavascriptInterface
         fun invoke(request: String) {
@@ -375,6 +461,12 @@ class MainActivity : Activity() {
                         "navigate_to" -> {
                             val url = JSONTokener(payload).nextValue() as String
                             navigate(url)
+                            "null"
+                        }
+                        "check_update" -> checkUpdate().toString()
+                        "install_update" -> {
+                            val url = JSONTokener(payload).nextValue() as String
+                            installUpdate(url)
                             "null"
                         }
                         else -> "null"

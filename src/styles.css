@@ -222,3 +222,42 @@ body {
 .status .progress-line {
     color: var(--text);
 }
+
+.update-banner {
+    margin-top: 18px;
+    padding: 14px;
+    background: rgba(47, 143, 91, 0.08);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+}
+
+.update-banner.hidden {
+    display: none;
+}
+
+.update-text {
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.update-text strong {
+    display: block;
+    margin-bottom: 2px;
+}
+
+.btn-link {
+    display: block;
+    margin: 14px auto 0;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.btn-link:hover {
+    color: var(--text);
+}

@@ -58,6 +58,20 @@
         <p class="hint">Provide at least one address (web server on port 80). IPs are verified and updated automatically when connecting to a camera. Use Save to store multiple cameras.</p>
 
         <div id="status" class="status hidden"></div>
+
+        <div id="updateSection" class="hidden" style="margin-top:16px;text-align:center;">
+            <button type="button" id="checkUpdateBtn" class="btn-link">Check for updates</button>
+            <div id="updateBanner" class="update-banner hidden">
+                <div class="update-text">
+                    <strong id="updateLabel">Update available</strong>
+                    <span id="updateDetail"></span>
+                </div>
+                <div class="btn-row">
+                    <button type="button" id="updateInstallBtn" class="btn primary">Download</button>
+                    <button type="button" id="updateLaterBtn" class="btn secondary">Later</button>
+                </div>
+            </div>
+        </div>
     </main>
 
     <script src="bridge.js"></script>

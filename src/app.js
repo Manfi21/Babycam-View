@@ -259,6 +259,64 @@
         }
     });
 
+    function isElectron() {
+        return /Electron/i.test(navigator.userAgent);
+    }
+
+    function semverGt(a, b) {
+        const pa = String(a).split(".").map(function (n) { return parseInt(n, 10) || 0; });
+        const pb = String(b).split(".").map(function (n) { return parseInt(n, 10) || 0; });
+        for (var i = 0; i < 3; i++) {
+            if ((pa[i] || 0) > (pb[i] || 0)) return true;
+            if ((pa[i] || 0) < (pb[i] || 0)) return false;
+        }
+        return false;
+    }
+
+    if (!isElectron()) {
+        document.getElementById("updateSection").classList.remove("hidden");
+    }
+
+    async function checkForUpdates() {
+        const btn = document.getElementById("checkUpdateBtn");
+        btn.disabled = true;
+        btn.textContent = "Checking...";
+        try {
+            const info = await invoke("check_update");
+            if (!info || !info.latestVersion) {
+                btn.textContent = "No update found";
+                setTimeout(function () { btn.textContent = "Check for updates"; btn.disabled = false; }, 2000);
+                return;
+            }
+            if (semverGt(info.latestVersion, info.currentVersion)) {
+                document.getElementById("updateLabel").textContent = "Update available: " + info.latestVersion;
+                document.getElementById("updateDetail").textContent = "(installed " + info.currentVersion + ")";
+                document.getElementById("updateBanner").classList.remove("hidden");
+                document.getElementById("updateInstallBtn").onclick = function () {
+                    if (info.downloadUrl) {
+                        invoke("install_update", info.downloadUrl);
+                        setStatus("busy", "Downloading update...");
+                    } else if (info.releaseUrl) {
+                        window.open(info.releaseUrl, "_blank");
+                    }
+                };
+                btn.textContent = "Check for updates";
+            } else {
+                btn.textContent = "Up to date";
+                setTimeout(function () { btn.textContent = "Check for updates"; btn.disabled = false; }, 2000);
+                return;
+            }
+        } catch (e) {
+            btn.textContent = "Check for updates";
+        }
+        btn.disabled = false;
+    }
+
+    document.getElementById("checkUpdateBtn").addEventListener("click", checkForUpdates);
+    document.getElementById("updateLaterBtn").addEventListener("click", function () {
+        document.getElementById("updateBanner").classList.add("hidden");
+    });
+
     (async function init() {
         try {
             const manual = new URLSearchParams(window.location.search).has("manual");

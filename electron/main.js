@@ -1,13 +1,17 @@
 "use strict";
 
-const { app, BrowserWindow, ipcMain, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, Menu, shell, dialog } = require("electron");
 const path = require("path");
 const net = require("net");
 const http = require("http");
+const https = require("https");
+const fs = require("fs");
 const { URL } = require("url");
 
 const PORT = 80;
 const CONNECT_TIMEOUT_MS = 1800;
+const APP_VERSION = require(path.join(__dirname, "..", "package.json")).version;
+const GITHUB_API = "https://api.github.com/repos/Manfi21/Babycam-View/releases/latest";
 
 let mainWindow = null;
 let lastCameraUrl = null;
@@ -28,6 +32,10 @@ function createWindow() {
             sandbox: false,
         },
     });
+
+    mainWindow.webContents.setUserAgent(
+        mainWindow.webContents.getUserAgent() + " BabyCamView/" + APP_VERSION
+    );
 
     mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 
@@ -119,8 +127,10 @@ async function testConnection(profile) {
 }
 
 function httpGet(url, timeoutMs = 4000) {
+    const mod = url.startsWith("https") ? https : http;
+    const headers = url.includes("github.com") ? { "User-Agent": "BabyCam-View/" + APP_VERSION } : {};
     return new Promise((resolve) => {
-        const req = http.get(url, { timeout: timeoutMs }, (res) => {
+        const req = mod.get(url, { timeout: timeoutMs, headers }, (res) => {
             const chunks = [];
             res.on("data", (c) => chunks.push(c));
             res.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
@@ -177,6 +187,95 @@ function sendProgress(message) {
     }
 }
 
+async function menuCheckUpdate() {
+    try {
+        const body = await httpGet(GITHUB_API);
+        if (!body) { dialog.showMessageBox(mainWindow, { type: "info", message: "Could not check for updates." }); return; }
+        const json = JSON.parse(body);
+        const latest = (json.tag_name || "").replace(/^v/, "");
+        if (!semverGt(latest, APP_VERSION)) {
+            dialog.showMessageBox(mainWindow, { type: "info", message: "You are up to date (v" + APP_VERSION + ")." });
+            return;
+        }
+        let downloadUrl = "";
+        if (json.assets && Array.isArray(json.assets)) {
+            for (const a of json.assets) {
+                const name = a.name || "";
+                if (process.platform === "linux" && name.endsWith(".AppImage")) { downloadUrl = a.browser_download_url; break; }
+                if (process.platform === "win32" && name.endsWith(".exe")) { downloadUrl = a.browser_download_url; break; }
+            }
+        }
+        const result = await dialog.showMessageBox(mainWindow, {
+            type: "question",
+            buttons: ["Download & Install", "Later"],
+            defaultId: 0,
+            message: "Update available: v" + latest,
+            detail: "Installed: v" + APP_VERSION,
+        });
+        if (result.response === 0 && downloadUrl) {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send("connect-progress", "Downloading update v" + latest + "…");
+            }
+            await downloadAndInstall(downloadUrl);
+        }
+    } catch (e) {
+        dialog.showMessageBox(mainWindow, { type: "info", message: "Could not check for updates." });
+    }
+}
+
+async function downloadAndInstall(downloadUrl) {
+    const currentAppImage = process.env.APPIMAGE;
+    const isAppImage = process.platform === "linux" && currentAppImage;
+    const fileName = downloadUrl.split("/").pop().split("?")[0];
+    let destPath;
+    if (isAppImage) {
+        destPath = path.join(path.dirname(currentAppImage), fileName);
+    } else if (process.platform === "win32") {
+        destPath = path.join(app.getPath("downloads"), fileName);
+    } else {
+        destPath = path.join(app.getPath("downloads"), fileName);
+    }
+    const file = fs.createWriteStream(destPath);
+    function follow(url) {
+        return new Promise((resolve) => {
+            const mod = url.startsWith("https") ? https : http;
+            mod.get(url, (response) => {
+                if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                    follow(response.headers.location).then(resolve);
+                    return;
+                }
+                response.pipe(file);
+                file.on("finish", () => {
+                    file.close();
+                    fs.chmodSync(destPath, 0o755);
+                    dialog.showMessageBox(mainWindow, {
+                        type: "info",
+                        message: "Update downloaded",
+                        detail: "Saved to:\n" + destPath,
+                        buttons: ["OK"],
+                    });
+                    resolve();
+                });
+            }).on("error", () => {
+                try { file.close(); fs.unlinkSync(destPath); } catch (_) {}
+                dialog.showMessageBox(mainWindow, { type: "error", message: "Download failed." });
+                resolve();
+            });
+        });
+    }
+    await follow(downloadUrl);
+}
+
+function semverGt(a, b) {
+    const pa = String(a).split(".").map((n) => parseInt(n, 10) || 0);
+    const pb = String(b).split(".").map((n) => parseInt(n, 10) || 0);
+    for (let i = 0; i < 3; i++) {
+        if ((pa[i] || 0) > (pb[i] || 0)) return true;
+        if ((pa[i] || 0) < (pb[i] || 0)) return false;
+    }
+    return false;
+}
+
 function createMenu() {
     const template = [
         {
@@ -191,6 +290,25 @@ function createMenu() {
                     },
                 },
                 { label: "Settings", accelerator: "CmdOrCtrl+Shift+S", click: () => { mainWindow.loadURL(settingsHome()); } },
+                { type: "separator" },
+                { label: "Check for Updates…", click: () => menuCheckUpdate() },
+                { type: "separator" },
+                {
+                    label: "About BabyCam View",
+                    click: async () => {
+                        const result = await dialog.showMessageBox(mainWindow, {
+                            type: "info",
+                            title: "About BabyCam View",
+                            message: "BabyCam View",
+                            detail: "Version: " + APP_VERSION,
+                            buttons: ["GitHub", "OK"],
+                            defaultId: 1,
+                        });
+                        if (result.response === 0) {
+                            shell.openExternal("https://github.com/Manfi21/Babycam-View");
+                        }
+                    },
+                },
                 { type: "separator" },
                 { role: "quit", label: "Quit" },
             ],
@@ -211,6 +329,36 @@ ipcMain.handle("navigate_to", (_e, url) => {
     lastCameraUrl = String(url || "");
     createMenu();
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadURL(url);
+});
+ipcMain.handle("check_update", async () => {
+    const result = { currentVersion: APP_VERSION };
+    try {
+        const body = await httpGet(GITHUB_API);
+        if (body) {
+            const json = JSON.parse(body);
+            result.latestVersion = (json.tag_name || "").replace(/^v/, "");
+            result.releaseNotes = json.body || "";
+            result.releaseUrl = json.html_url || "";
+            if (json.assets && Array.isArray(json.assets)) {
+                for (const a of json.assets) {
+                    const name = a.name || "";
+                    if (process.platform === "linux" && name.endsWith(".AppImage")) {
+                        result.downloadUrl = a.browser_download_url;
+                        break;
+                    }
+                    if (process.platform === "win32" && name.endsWith(".exe")) {
+                        result.downloadUrl = a.browser_download_url;
+                        break;
+                    }
+                }
+            }
+        }
+    } catch (e) { /* ignore */ }
+    return result;
+});
+ipcMain.handle("install_update", async (_e, downloadUrl) => {
+    if (!downloadUrl) return;
+    await downloadAndInstall(downloadUrl);
 });
 
 app.whenReady().then(() => {
